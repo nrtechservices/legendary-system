@@ -216,6 +216,36 @@
 .rep-sum-label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; }
 .rep-sum-val { font-size: 1.8rem; font-weight: 700; color: #f59e0b; }
 
+
+    /* --- NEW: LEDGER STYLES --- */
+    .ledger-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Courier New', Courier, monospace; /* Monospace for numbers */
+        font-size: 0.8rem;
+        min-width: 600px; /* Forces scroll on mobile */
+    }
+    .ledger-table th {
+        text-align: left;
+        padding: 10px;
+        background: var(--surface-light);
+        color: var(--text-sub);
+        border-bottom: 2px solid #555;
+    }
+    .ledger-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #334155;
+    }
+    .ledger-table tr:hover td {
+        background: rgba(255,255,255,0.05);
+    }
+    .ledger-table tfoot td {
+        border-top: 2px solid var(--primary);
+        font-weight: bold;
+        padding-top: 15px;
+        background: #162032;
+    }
+
     </style>
 </head>
 <body>
@@ -406,24 +436,55 @@
         </div>
     </div>
 
-    <div class="bottom-nav">
+    <div id="tab-ledger" class="view-section">
+    <div class="card" style="overflow-x: auto;">
+        <div class="section-header">
+            <span class="section-title"><i class="fas fa-table"></i> Master Office Ledger</span>
+            <button onclick="renderMasterLedger()" style="background:none; border:none; color:var(--primary); font-size:0.8rem;">REFRESH</button>
+        </div>
+        
+        <table class="ledger-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th class="text-green">Income</th>
+                    <th class="text-red">Exp/Liab</th>
+                    <th class="text-gold">Net Profit</th>
+                    <th class="text-white">Collected</th>
+                    <th class="text-gold" style="border-left: 1px solid #444;">Alloc. Save</th>
+                    <th class="text-red">Withdrawn</th>
+                    <th class="text-white">Cash On Hand</th>
+                </tr>
+            </thead>
+            <tbody id="ledger-body">
+                </tbody>
+            <tfoot id="ledger-foot">
+                </tfoot>
+        </table>
+    </div>
+</div>
+
+
+        <div class="bottom-nav">
         <button class="nav-item active" onclick="switchTab('dash', this)">
-            <i class="fas fa-home"></i>
-            <span>Home</span>
+            <i class="fas fa-home"></i> <span>Home</span>
         </button>
         <button class="nav-item" onclick="switchTab('trans', this)">
-            <i class="fas fa-list"></i>
-            <span>Items</span>
+            <i class="fas fa-list"></i> <span>Items</span>
         </button>
         <button class="nav-item" onclick="switchTab('receivables', this)">
-            <i class="fas fa-users"></i>
-            <span>Debts</span>
+            <i class="fas fa-users"></i> <span>Debts</span>
         </button>
         <button class="nav-item" onclick="switchTab('savings', this)">
-            <i class="fas fa-wallet"></i>
-            <span>Save</span>
+            <i class="fas fa-wallet"></i> <span>Save</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('ledger', this); renderMasterLedger();">
+            <i class="fas fa-table"></i> <span>Ledger</span>
         </button>
     </div>
+
+
+
 
     <div class="fab-options" id="fabMenu">
     <button class="fab-btn" onclick="downloadReport()">📄 Full A4 Report</button>
@@ -543,21 +604,45 @@
         document.querySelector('.fab i').classList.remove('fa-times');
     }
 
-    function loadMonth() {
+        function loadMonth() {
         currentMonth = document.getElementById('monthSelect').value;
         const saved = localStorage.getItem('NRAPP_' + currentMonth);
         
         if (saved) {
             data = JSON.parse(saved);
             if (!data.withdrawals) data.withdrawals = [];
-            // Backward compatibility: ensure existing withdrawals have a category
             data.withdrawals.forEach(w => { if(!w.cat) w.cat = 'personal'; });
         } else {
+            // --- NEW: AUTO CARRY OVER LOGIC ---
+            const prevId = getPrevMonthId(currentMonth);
+            const prevDataJson = localStorage.getItem('NRAPP_' + prevId);
+            let carriedReceivables = [];
+
+            if (prevDataJson) {
+                const prevData = JSON.parse(prevDataJson);
+                // Loop through previous debtors
+                prevData.receivables.forEach(r => {
+                    const debt = parseFloat(r.total) || 0;
+                    const paid = parseFloat(r.paid) || 0;
+                    const remaining = debt - paid;
+
+                    // If they still owe money, move them to this month
+                    if (remaining > 0.1) { // 0.1 tolerance for float errors
+                        carriedReceivables.push({
+                            desc: r.desc + " (Bal)", // Optional: Add marker
+                            total: remaining,
+                            paid: 0 // Reset paid for new month
+                        });
+                    }
+                });
+            }
+
+            // Initialize new month
             data = {
                 income: [{desc: "Service/Sales", val: 0}],
                 expenses: [],
                 liabilities: [],
-                receivables: [],
+                receivables: carriedReceivables, // <--- Load carried over debts here
                 withdrawals: [],
                 personalFare: 0
             };
@@ -565,6 +650,8 @@
         document.getElementById('adj-personal').value = data.personalFare == 0 ? '' : data.personalFare;
         renderAll();
         calculate();
+        // Generate Ledger view whenever we load
+        renderMasterLedger(); 
     }
 
     function renderAll() {
@@ -948,9 +1035,117 @@
     function save() { localStorage.setItem('NRAPP_' + currentMonth, JSON.stringify(data)); }
 
     loadMonth();
+    
+        // --- NEW HELPER: Get Previous Month ID ---
+    function getPrevMonthId(currentId) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const parts = currentId.split('_'); // ["Feb", "2026"]
+        let mIndex = months.indexOf(parts[0]);
+        let year = parseInt(parts[1]);
+
+        if (mIndex === 0) {
+            // If Jan, go to Dec of previous year
+            mIndex = 11;
+            year--;
+        } else {
+            mIndex--;
+        }
+        return `${months[mIndex]}_${year}`;
+    }
+    
+    
+        // --- NEW: RENDER MASTER LEDGER ---
+    function renderMasterLedger() {
+    const tbody = document.getElementById('ledger-body');
+    const tfoot = document.getElementById('ledger-foot');
+    tbody.innerHTML = '';
+    
+    let allKeys = [];
+    // 1. Gather all data
+    for(let i=0; i<localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if(k.startsWith('NRAPP_')) allKeys.push(k);
+    }
+    
+    // 2. Sort keys by date (Oldest to Newest)
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    allKeys.sort((a,b) => {
+        const [p1, m1, y1] = a.split('_'); 
+        const [p2, m2, y2] = b.split('_');
+        if(y1 !== y2) return y1 - y2;
+        return months.indexOf(m1) - months.indexOf(m2);
+    });
+
+    // Initialize Totals
+    let totInc=0, totExp=0, totProf=0, totCol=0, totSaved=0, totWdr=0, totCash=0;
+
+    // 3. Build Table
+    allKeys.forEach(key => {
+        const raw = JSON.parse(localStorage.getItem(key));
+        const dateStr = key.replace('NRAPP_', '').replace('_', ' ');
+        
+        // Helper to sum arrays
+        const sum = (arr) => arr.reduce((a,b)=>a+(parseFloat(b.val)||0),0);
+        const sumRec = (arr) => arr.reduce((a,b)=>a+(parseFloat(b.paid)||0),0);
+        
+        // Extract values
+        const i = sum(raw.income);
+        const e = sum(raw.expenses) + sum(raw.liabilities);
+        const profit = i - e;
+        const col = sumRec(raw.receivables);
+        const wdr = sum(raw.withdrawals || []);
+        const persFare = parseFloat(raw.personalFare) || 0;
+        
+        // --- LOGIC: Calculate Allocation vs Cash ---
+        // Savings = (Profit + Collected) - Personal Adjustment. Cannot be negative.
+        const savingsBase = Math.max(0, (profit + col - persFare));
+        
+        // Cash = The Savings we have minus what we withdrew
+        const cash = savingsBase - wdr;
+
+        // Add to totals
+        totInc += i; 
+        totExp += e; 
+        totProf += profit; 
+        totCol += col; 
+        totSaved += savingsBase; // Add to total savings
+        totWdr += wdr; 
+        totCash += cash;
+
+        tbody.innerHTML += `
+            <tr>
+                <td style="color:var(--text-sub)">${dateStr}</td>
+                <td class="text-green">${fmtS(i)}</td>
+                <td class="text-red">${fmtS(e)}</td>
+                <td class="text-gold">${fmtS(profit)}</td>
+                <td>${fmtS(col)}</td>
+                <td class="text-gold" style="border-left: 1px solid #334155; font-weight:bold;">${fmtS(savingsBase)}</td>
+                <td class="text-red">${fmtS(wdr)}</td>
+                <td class="text-white font-bold">${fmtS(cash)}</td>
+            </tr>
+        `;
+    });
+
+    // 4. Footer Totals
+    tfoot.innerHTML = `
+        <tr>
+            <td>TOTALS</td>
+            <td class="text-green">${fmtS(totInc)}</td>
+            <td class="text-red">${fmtS(totExp)}</td>
+            <td class="text-gold">${fmtS(totProf)}</td>
+            <td>${fmtS(totCol)}</td>
+            <td class="text-gold" style="border-left: 1px solid #555;">${fmtS(totSaved)}</td>
+            <td class="text-red">${fmtS(totWdr)}</td>
+            <td class="text-white">${fmtS(totCash)}</td>
+        </tr>
+    `;
+}
+
+
 </script>
 
 </body>
 </html>
+
 
 
