@@ -904,14 +904,25 @@
         document.getElementById('rep-total-col').innerText = fmt(totCol);
         document.getElementById('rep-total-wdr').innerText = fmt(totWdr);
 
-        // 5. Fill Savings & Summary
-        document.getElementById('rep-sav-biz').innerText = document.getElementById('save-biz').innerText;
-        document.getElementById('rep-sav-pers').innerText = document.getElementById('save-personal').innerText;
-        document.getElementById('rep-sav-emer').innerText = document.getElementById('save-emergency').innerText;
-        document.getElementById('rep-sav-total').innerText = document.getElementById('dash-savings').innerText;
+         // 5. Fill Savings & Summary
+    document.getElementById('rep-sav-biz').innerText = document.getElementById('save-biz').innerText;
+    document.getElementById('rep-sav-pers').innerText = document.getElementById('save-personal').innerText;
+    document.getElementById('rep-sav-emer').innerText = document.getElementById('save-emergency').innerText;
 
-        document.getElementById('rep-sum-profit').innerText = document.getElementById('dash-profit').innerText;
-        document.getElementById('rep-sum-cash').innerText = document.getElementById('net-cash').innerText;
+    // --- NEW LOGIC: Calculate Net Savings (Allocated - Withdrawn) ---
+    // 1. Get the Gross Savings value (remove '₱' and commas to do math)
+    const rawSavings = parseFloat(document.getElementById('dash-savings').innerText.replace(/[^\d.-]/g, '')) || 0;
+    
+    // 2. Get the Total Withdrawn value
+    const rawWdr = parseFloat(document.getElementById('total-withdrawn').innerText.replace(/[^\d.-]/g, '')) || 0;
+
+    // 3. Set the Total row to the result
+    document.getElementById('rep-sav-total').innerText = fmt(rawSavings - rawWdr);
+    // ----------------------------------------------------------------
+
+    document.getElementById('rep-sum-profit').innerText = document.getElementById('dash-profit').innerText;
+    document.getElementById('rep-sum-cash').innerText = document.getElementById('net-cash').innerText;
+
 
         // 6. Generate Image
         html2canvas(area, {
