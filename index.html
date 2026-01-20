@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <title>N'RTECH Manager</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #f59e0b; /* Warm Gold */
+            --primary-dim: rgba(245, 158, 11, 0.15);
+            --bg: #0f172a; /* Deep Black/Blue */
+            --surface: #1e293b; /* Card Grey */
+            --surface-light: #334155;
+            --text-main: #f1f5f9;
+            --text-sub: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --nav-height: 70px;
+            --header-height: 60px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0; padding: 0;
+            padding-top: var(--header-height);
+            padding-bottom: calc(var(--nav-height) + 20px);
+            overflow-x: hidden; user-select: none;
+        }
+
+        /* --- APP BAR --- */
+        .app-bar {
+            position: fixed; top: 0; left: 0; width: 100%; height: var(--header-height);
+            background: var(--surface); display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000;
+            border-bottom: 1px solid #334155;
+        }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.1rem; letter-spacing: 0.5px; }
+        .brand span { color: var(--primary); }
+        .month-selector {
+            background: var(--bg); color: var(--primary); border: 1px solid var(--surface-light);
+            padding: 5px 10px; border-radius: 20px; font-size: 0.85rem; outline: none; font-weight: 600;
+        }
+
+        /* --- TABS --- */
+        .view-section { display: none; padding: 15px; animation: fadeIn 0.3s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height);
+            background: var(--surface); display: flex; justify-content: space-around; align-items: center;
+            border-top: 1px solid #334155; z-index: 1000; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; color: var(--text-sub);
+            font-size: 0.75rem; background: none; border: none; cursor: pointer; width: 100%;
+            padding: 10px 0; transition: 0.2s;
+        }
+        .nav-item.active { color: var(--primary); }
+        
+        /* --- CARDS --- */
+        .card {
+            background: var(--surface); border-radius: 16px; padding: 20px; margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .balance-card {
+            text-align: center; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid var(--primary); box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
+        }
+        .section-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+            border-bottom: 1px solid var(--surface-light); padding-bottom: 10px;
+        }
+        .section-title { font-weight: 700; color: var(--primary); font-size: 1rem; display:flex; align-items:center; gap:8px;} 
+        
+        /* --- LISTS & INPUTS --- */
+        .list-item {
+            background: var(--bg); padding: 10px; border-radius: 10px; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        input { background: transparent; border: none; color: var(--text-main); font-size: 0.95rem; outline: none; width: 100%; }
+        input.amount { text-align: right; font-weight: 600; width: 80px; }
+        input::placeholder { color: #475569; }
+        .wdr-select {
+            background: var(--surface-light); color: var(--text-main); border: none;
+            border-radius: 5px; padding: 5px; font-size: 0.75rem; width: 60px;
+        }
+        .btn-icon {
+            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; border: none; background: rgba(239, 68, 68, 0.15);
+            color: var(--danger); cursor: pointer;
+        }
+        .btn-add {
+            width: 100%; padding: 12px; border-radius: 12px; border: 1px dashed var(--primary);
+            background: transparent; color: var(--primary); font-weight: 600; margin-top: 5px;
+        }
+        .btn-add:active { background: var(--primary-dim); }
+
+        /* --- DASHBOARD GRID --- */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .mini-stat {
+            background: var(--surface); padding: 15px; border-radius: 12px;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .mini-stat label { font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; margin-bottom: 5px; }
+        .mini-stat div { font-size: 1.1rem; font-weight: 700; }
+
+        /* --- FAB --- */
+        .fab {
+            position: fixed; bottom: calc(var(--nav-height) + 20px); right: 20px;
+            width: 56px; height: 56px; border-radius: 50%; background: var(--primary);
+            color: #000; border: none; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+            font-size: 24px; display: flex; align-items: center; justify-content: center; z-index: 900;
+        }
+        .fab-options {
+            position: fixed; bottom: calc(var(--nav-height) + 85px); right: 20px;
+            display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+            z-index: 899; pointer-events: none; opacity: 0; transition: 0.2s;
+        }
+        .fab-options.open { pointer-events: auto; opacity: 1; }
+        .fab-btn {
+            background: var(--surface); color: white; padding: 10px 15px;
+            border-radius: 20px; text-decoration: none; border: 1px solid var(--primary);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px;
+        }
+
+        /* --- UTILS --- */
+        .text-green { color: var(--success); }
+        .text-red { color: var(--danger); }
+        .text-gold { color: var(--primary); }
+        .text-white { color: white; }
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        .sub-info { font-size: 0.7rem; color: var(--text-sub); display: block; margin-top: 2px;}
+
+        /* --- PRINT/RENDER AREAS (HIDDEN FROM APP VIEW) --- */
+        .render-area {
+            position: fixed; top: -9999px; left: -9999px;
+            background: white; color: black;
+            font-family: 'Helvetica', sans-serif;
+        }
+
+        /* PDF Report Styles */
+        #pdf-report { width: 800px; padding: 40px; }
+        .pdf-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #f59e0b; padding-bottom: 20px; margin-bottom: 20px; }
+        .pdf-title h1 { margin: 0; color: #0f172a; font-size: 2.5rem; }
+        .pdf-title p { margin: 0; color: #64748b; }
+        .pdf-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .pdf-card { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; text-align: center; }
+        .pdf-card h3 { margin: 0 0 5px 0; font-size: 0.8rem; color: #64748b; text-transform: uppercase; }
+        .pdf-card p { margin: 0; font-size: 1.4rem; font-weight: bold; color: #0f172a; }
+        
+        .pdf-section { margin-bottom: 30px; }
+        .pdf-section h2 { color: #f59e0b; font-size: 1.2rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 10px; }
+        .pdf-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .pdf-table th { text-align: left; padding: 8px; background: #0f172a; color: white; }
+        .pdf-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+        .pdf-table tr:nth-child(even) { background-color: #f8fafc; }
+        .pdf-total-row td { font-weight: bold; border-top: 2px solid #000; color: #000; }
+        
+        /* Receipt Styles */
+        #receipt-render { width: 350px; padding: 20px; font-family: 'Courier New', Courier, monospace; background: #fff; border: 1px solid #eee; }
+        .rec-header { text-align: center; margin-bottom: 15px; }
+        .rec-logo { font-weight: 900; font-size: 1.5rem; letter-spacing: 2px; margin-bottom: 5px; }
+        .rec-meta { font-size: 0.75rem; color: #555; }
+        .rec-divider { border-top: 1px dashed #000; margin: 10px 0; }
+        .rec-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem; }
+        .rec-total { font-weight: bold; font-size: 1.1rem; margin-top: 5px; }
+        .rec-footer { text-align: center; font-size: 0.7rem; margin-top: 20px; color: #777; }
+
+    </style>
+</head>
+<body>
+
+    <nav class="app-bar">
+        <div class="brand">
+            <i class="fas fa-cube" style="color:var(--primary)"></i>
+            <div>N'<span>R</span>TECH</div>
+        </div>
+        <select class="month-selector" id="monthSelect" onchange="loadMonth()">
+            <option value="Jan_2026">Jan 2026</option>
+            <option value="Feb_2026">Feb 2026</option>
+            <option value="Mar_2026">Mar 2026</option>
+            <option value="Apr_2026">Apr 2026</option>
+            <option value="May_2026">May 2026</option>
+            <option value="Jun_2026">Jun 2026</option>
+            <option value="Jul_2026">Jul 2026</option>
+            <option value="Aug_2026">Aug 2026</option>
+            <option value="Sep_2026">Sep 2026</option>
+            <option value="Oct_2026">Oct 2026</option>
+            <option value="Nov_2026">Nov 2026</option>
+            <option value="Dec_2026">Dec 2026</option>
+        </select>
+    </nav>
+
+    <div id="tab-dash" class="view-section active">
+        <div class="card balance-card">
+            <div style="font-size:0.8rem; color:var(--text-sub); margin-bottom:5px;">NET PROFIT THIS MONTH</div>
+            <div style="font-size:2.5rem; font-weight:800; color:var(--primary);" id="dash-profit">₱0.00</div>
+        </div>
+
+        <div class="stat-grid">
+            <div class="mini-stat">
+                <label>Income</label>
+                <div class="text-green" id="dash-income">₱0.00</div>
+            </div>
+            <div class="mini-stat">
+                <label>Expenses</label>
+                <div class="text-red" id="dash-expense">₱0.00</div>
+            </div>
+            <div class="mini-stat">
+                <label>Liabilities</label>
+                <div class="text-red" id="dash-liab">₱0.00</div>
+            </div>
+            <div class="mini-stat" style="border:1px solid var(--primary);">
+                <label>Total Savings</label>
+                <div class="text-gold" id="dash-savings">₱0.00</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:15px;">
+            <div class="section-header">
+                <span class="section-title"><i class="fas fa-chart-bar"></i> Monthly Breakdown</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-header">
+                <span class="section-title"><i class="fas fa-chart-line"></i> Yearly Trend</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-trans" class="view-section">
+        <div class="card">
+            <div class="section-header">
+                <span class="section-title text-green"><i class="fas fa-arrow-down"></i> Income</span>
+                <span id="total-income" class="text-green font-bold">₱0.00</span>
+            </div>
+            <div id="list-income"></div>
+            <button class="btn-add" onclick="addItem('income')">+ Add Income</button>
+        </div>
+
+        <div class="card">
+            <div class="section-header">
+                <span class="section-title text-red"><i class="fas fa-arrow-up"></i> Expenses</span>
+                <span id="total-expenses" class="text-red font-bold">₱0.00</span>
+            </div>
+            <div id="list-expenses"></div>
+            <button class="btn-add" onclick="addItem('expenses')">+ Add Expense</button>
+        </div>
+
+        <div class="card">
+            <div class="section-header">
+                <span class="section-title text-red"><i class="fas fa-exclamation-circle"></i> Liabilities</span>
+                <span id="total-liabilities" class="text-red font-bold">₱0.00</span>
+            </div>
+            <div id="list-liabilities"></div>
+            <button class="btn-add" onclick="addItem('liabilities')">+ Add Liability</button>
+        </div>
+    </div>
+
+    <div id="tab-receivables" class="view-section">
+        <div class="card">
+            <div class="section-header">
+                <span class="section-title"><i class="fas fa-hand-holding-usd"></i> Debtors</span>
+                <span style="font-size:0.8rem;" id="total-collected">Col: ₱0</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-sub); display:flex; margin-bottom:10px; padding:0 10px;">
+                <span style="flex:2">Name</span>
+                <span style="flex:1; text-align:right">Debt</span>
+                <span style="flex:1; text-align:right">Paid</span>
+                <span style="width:30px"></span>
+            </div>
+            <div id="list-receivables"></div>
+            <button class="btn-add" onclick="addItem('receivables')">+ Add Debtor</button>
+        </div>
+    </div>
+
+    <div id="tab-savings" class="view-section">
+        <div class="card" style="border: 1px solid var(--primary);">
+            <div class="section-header">
+                <span class="section-title"><i class="fas fa-piggy-bank"></i> Allocation (Remaining)</span>
+            </div>
+            
+            <div class="list-item" style="justify-content:space-between;">
+                <span>Collections</span>
+                <span class="text-green font-bold" id="disp-col">₱0.00</span>
+            </div>
+            <div class="list-item">
+                <span style="flex:1">Less: Personal Use</span>
+                <input type="number" id="adj-personal" oninput="calculate()" placeholder="0" class="amount" style="color:var(--danger); width:100px;">
+            </div>
+
+            <hr style="border:0; border-top:1px dashed #334155; margin:15px 0;">
+
+            <div style="display:grid; grid-template-columns: 1fr; gap:10px;">
+                <div class="list-item" style="background:var(--surface-light); flex-direction:column; align-items:flex-start;">
+                    <div style="width:100%; display:flex; justify-content:space-between;">
+                        <span>Business (40%)</span>
+                        <span class="text-gold font-bold" style="font-size:1.1rem;" id="save-biz">₱0</span>
+                    </div>
+                    <span class="sub-info" id="info-biz">Allocated: 0 | Wdr: 0</span>
+                </div>
+
+                <div class="list-item" style="background:var(--surface-light); flex-direction:column; align-items:flex-start;">
+                    <div style="width:100%; display:flex; justify-content:space-between;">
+                        <span>Personal (40%)</span>
+                        <span class="text-gold font-bold" style="font-size:1.1rem;" id="save-personal">₱0</span>
+                    </div>
+                    <span class="sub-info" id="info-personal">Allocated: 0 | Wdr: 0</span>
+                </div>
+
+                <div class="list-item" style="background:var(--surface-light); flex-direction:column; align-items:flex-start;">
+                    <div style="width:100%; display:flex; justify-content:space-between;">
+                        <span>Emergency (20%)</span>
+                        <span class="text-gold font-bold" style="font-size:1.1rem;" id="save-emergency">₱0</span>
+                    </div>
+                    <span class="sub-info" id="info-emergency">Allocated: 0 | Wdr: 0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="border: 1px solid var(--danger);">
+            <div class="section-header">
+                <span class="section-title text-red"><i class="fas fa-money-bill-wave"></i> Withdrawals</span>
+                <span id="total-withdrawn" class="text-red font-bold">₱0.00</span>
+            </div>
+            <div id="list-withdrawals"></div>
+            <button class="btn-add" style="border-color:var(--danger); color:var(--danger);" onclick="addItem('withdrawals')">+ Add Withdrawal</button>
+        </div>
+
+        <div class="card balance-card">
+            <div style="font-size:0.8rem; color:var(--text-sub); margin-bottom:5px;">NET CASH ON HAND</div>
+            <div style="font-size:2rem; font-weight:800; color:white;" id="net-cash">₱0.00</div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('dash', this)">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('trans', this)">
+            <i class="fas fa-list"></i>
+            <span>Items</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('receivables', this)">
+            <i class="fas fa-users"></i>
+            <span>Debts</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('savings', this)">
+            <i class="fas fa-wallet"></i>
+            <span>Save</span>
+        </button>
+    </div>
+
+    <div class="fab-options" id="fabMenu">
+        <button class="fab-btn" onclick="generatePDF()"><i class="fas fa-file-pdf"></i> Print PDF Report</button>
+        <button class="fab-btn" onclick="downloadReceipt()"><i class="fas fa-receipt"></i> Save Receipt Img</button>
+        <button class="fab-btn" onclick="addItem('income'); switchTab('trans', document.querySelectorAll('.nav-item')[1])"><i class="fas fa-plus-circle"></i> Quick Income</button>
+    </div>
+    <button class="fab" onclick="toggleFab()">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <div id="receipt-render" class="render-area">
+        <div class="rec-header">
+            <div class="rec-logo">N'RTECH</div>
+            <div class="rec-meta">Official Receipt</div>
+            <div class="rec-meta" id="rec-date"></div>
+        </div>
+        <div class="rec-divider"></div>
+        <div id="rec-items"></div>
+        <div class="rec-divider"></div>
+        <div class="rec-item rec-total">
+            <span>NET PROFIT:</span>
+            <span id="rec-total-val"></span>
+        </div>
+        <div class="rec-footer">Thank you for your business!</div>
+    </div>
+
+    <div id="pdf-report" class="render-area">
+        <div class="pdf-header">
+            <div class="pdf-title">
+                <h1>N'RTECH</h1>
+                <p>Monthly Financial Report</p>
+            </div>
+            <div style="text-align:right;">
+                <h2 style="margin:0; color:#f59e0b" id="pdf-month">JAN 2026</h2>
+                <p style="margin:0; font-size:0.8rem; color:#64748b;" id="pdf-gendate">Generated: </p>
+            </div>
+        </div>
+
+        <div class="pdf-summary-grid">
+            <div class="pdf-card">
+                <h3>Income</h3>
+                <p style="color:#10b981" id="pdf-inc">0.00</p>
+            </div>
+            <div class="pdf-card">
+                <h3>Expenses</h3>
+                <p style="color:#ef4444" id="pdf-exp">0.00</p>
+            </div>
+            <div class="pdf-card">
+                <h3>Liabilities</h3>
+                <p style="color:#ef4444" id="pdf-liab">0.00</p>
+            </div>
+            <div class="pdf-card" style="background:#fff7ed; border-color:#f59e0b">
+                <h3>Net Profit</h3>
+                <p style="color:#f59e0b" id="pdf-prof">0.00</p>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;">
+            <div class="pdf-section">
+                <h2>Income Breakdown</h2>
+                <table class="pdf-table">
+                    <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+                    <tbody id="pdf-table-inc"></tbody>
+                </table>
+            </div>
+            <div class="pdf-section">
+                <h2>Expense Breakdown</h2>
+                <table class="pdf-table">
+                    <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+                    <tbody id="pdf-table-exp"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="pdf-section">
+            <h2>Cash Flow & Savings Analysis</h2>
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th style="text-align:right">Allocated</th>
+                        <th style="text-align:right">Withdrawn</th>
+                        <th style="text-align:right">Remaining</th>
+                    </tr>
+                </thead>
+                <tbody id="pdf-table-savings"></tbody>
+            </table>
+        </div>
+
+        <div style="text-align:right; margin-top:20px; padding-top:10px; border-top:2px solid #000;">
+            <span style="font-size:1.2rem; margin-right:20px;">Net Cash On Hand:</span>
+            <span style="font-size:1.8rem; font-weight:bold; color:#f59e0b;" id="pdf-netcash">0.00</span>
+        </div>
+    </div>
+
+<script>
+    // --- APP LOGIC ---
+    let currentMonth = "Jan_2026";
+    let data = {};
+    let barChartInst = null;
+    let lineChartInst = null;
+
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        if(btnElement) btnElement.classList.add('active');
+        window.scrollTo(0,0);
+        closeFab();
+    }
+
+    function toggleFab() {
+        document.getElementById('fabMenu').classList.toggle('open');
+        document.querySelector('.fab i').classList.toggle('fa-plus');
+        document.querySelector('.fab i').classList.toggle('fa-times');
+    }
+    
+    function closeFab() {
+        document.getElementById('fabMenu').classList.remove('open');
+        document.querySelector('.fab i').classList.add('fa-plus');
+        document.querySelector('.fab i').classList.remove('fa-times');
+    }
+
+    function loadMonth() {
+        currentMonth = document.getElementById('monthSelect').value;
+        const saved = localStorage.getItem('NRAPP_' + currentMonth);
+        
+        if (saved) {
+            data = JSON.parse(saved);
+            if (!data.withdrawals) data.withdrawals = [];
+            data.withdrawals.forEach(w => { if(!w.cat) w.cat = 'personal'; });
+        } else {
+            data = {
+                income: [{desc: "Service/Sales", val: 0}],
+                expenses: [],
+                liabilities: [],
+                receivables: [],
+                withdrawals: [],
+                personalFare: 0
+            };
+        }
+        document.getElementById('adj-personal').value = data.personalFare == 0 ? '' : data.personalFare;
+        renderAll();
+        calculate();
+    }
+
+    function renderAll() {
+        renderList('income', data.income);
+        renderList('expenses', data.expenses);
+        renderList('liabilities', data.liabilities);
+        renderWithdrawals();
+        renderRec();
+    }
+
+    function renderList(type, list) {
+        const container = document.getElementById(`list-${type}`);
+        container.innerHTML = '';
+        list.forEach((item, index) => {
+            container.innerHTML += `
+                <div class="list-item">
+                    <input type="text" value="${item.desc}" oninput="update('${type}', ${index}, 'desc', this.value)" placeholder="Description">
+                    <input type="number" class="amount" value="${item.val == 0 ? '' : item.val}" oninput="update('${type}', ${index}, 'val', this.value)" placeholder="0.00">
+                    <button class="btn-icon" onclick="del('${type}', ${index})"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `;
+        });
+    }
+
+    function renderWithdrawals() {
+        const container = document.getElementById('list-withdrawals');
+        container.innerHTML = '';
+        data.withdrawals.forEach((item, index) => {
+            container.innerHTML += `
+                <div class="list-item">
+                    <select class="wdr-select" onchange="update('withdrawals', ${index}, 'cat', this.value)">
+                        <option value="business" ${item.cat === 'business' ? 'selected' : ''}>Biz</option>
+                        <option value="personal" ${item.cat === 'personal' ? 'selected' : ''}>Pers</option>
+                        <option value="emergency" ${item.cat === 'emergency' ? 'selected' : ''}>Emer</option>
+                    </select>
+                    <input type="text" value="${item.desc}" oninput="update('withdrawals', ${index}, 'desc', this.value)" placeholder="Reason">
+                    <input type="number" class="amount" value="${item.val == 0 ? '' : item.val}" oninput="update('withdrawals', ${index}, 'val', this.value)" placeholder="0.00" style="color:var(--danger)">
+                    <button class="btn-icon" onclick="del('withdrawals', ${index})"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `;
+        });
+    }
+
+    function renderRec() {
+        const container = document.getElementById('list-receivables');
+        container.innerHTML = '';
+        data.receivables.forEach((item, index) => {
+            container.innerHTML += `
+                <div class="list-item">
+                    <input type="text" value="${item.desc}" oninput="updateRec(${index}, 'desc', this.value)" placeholder="Name" style="flex:2">
+                    <input type="number" class="amount" value="${item.total == 0 ? '' : item.total}" oninput="updateRec(${index}, 'total', this.value)" placeholder="Debt" style="flex:1">
+                    <input type="number" class="amount text-green" value="${item.paid == 0 ? '' : item.paid}" oninput="updateRec(${index}, 'paid', this.value)" placeholder="Paid" style="flex:1">
+                    <button class="btn-icon" onclick="del('receivables', ${index})"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `;
+        });
+    }
+
+    function addItem(type) {
+        if(type === 'receivables') data.receivables.push({desc: '', total: 0, paid: 0});
+        else if(type === 'withdrawals') data.withdrawals.push({desc: '', val: 0, cat: 'personal'});
+        else data[type].push({desc: '', val: 0});
+        renderAll();
+        save();
+        closeFab();
+    }
+
+    function del(type, index) {
+        data[type].splice(index, 1);
+        renderAll();
+        calculate();
+    }
+
+    function update(type, index, field, val) {
+        data[type][index][field] = (field === 'desc' || field === 'cat') ? val : parseFloat(val) || 0;
+        calculate();
+    }
+
+    function updateRec(index, field, val) {
+        data.receivables[index][field] = field === 'desc' ? val : parseFloat(val) || 0;
+        calculate();
+    }
+
+    function calculate() {
+        const sum = (arr) => arr.reduce((a, b) => a + (parseFloat(b.val)||0), 0);
+        const sumRec = (arr) => arr.reduce((a, b) => a + (parseFloat(b.paid)||0), 0);
+
+        const inc = sum(data.income);
+        const exp = sum(data.expenses);
+        const liab = sum(data.liabilities);
+        const col = sumRec(data.receivables);
+        
+        data.personalFare = parseFloat(document.getElementById('adj-personal').value) || 0;
+        
+        const netProfit = inc - exp - liab;
+        const savingsBase = netProfit + col - data.personalFare;
+        const allocatedSavings = Math.max(0, savingsBase);
+
+        let wdrBiz = 0, wdrPers = 0, wdrEmer = 0;
+        (data.withdrawals || []).forEach(w => {
+            const val = parseFloat(w.val) || 0;
+            if (w.cat === 'business') wdrBiz += val;
+            if (w.cat === 'personal') wdrPers += val;
+            if (w.cat === 'emergency') wdrEmer += val;
+        });
+        const totalWdr = wdrBiz + wdrPers + wdrEmer;
+
+        const baseBiz = allocatedSavings * 0.4;
+        const basePers = allocatedSavings * 0.4;
+        const baseEmer = allocatedSavings * 0.2;
+        const netCash = allocatedSavings - totalWdr;
+
+        document.getElementById('dash-profit').innerText = fmt(netProfit);
+        document.getElementById('dash-income').innerText = fmt(inc);
+        document.getElementById('dash-expense').innerText = fmt(exp);
+        document.getElementById('dash-liab').innerText = fmt(liab);
+        document.getElementById('dash-savings').innerText = fmt(allocatedSavings);
+
+        document.getElementById('total-income').innerText = fmt(inc);
+        document.getElementById('total-expenses').innerText = fmt(exp);
+        document.getElementById('total-liabilities').innerText = fmt(liab);
+        
+        document.getElementById('total-withdrawn').innerText = fmt(totalWdr);
+
+        document.getElementById('save-biz').innerText = fmt(baseBiz - wdrBiz);
+        document.getElementById('save-personal').innerText = fmt(basePers - wdrPers);
+        document.getElementById('save-emergency').innerText = fmt(baseEmer - wdrEmer);
+
+        document.getElementById('info-biz').innerText = `Allocated: ${fmtS(baseBiz)} | Wdr: ${fmtS(wdrBiz)}`;
+        document.getElementById('info-personal').innerText = `Allocated: ${fmtS(basePers)} | Wdr: ${fmtS(wdrPers)}`;
+        document.getElementById('info-emergency').innerText = `Allocated: ${fmtS(baseEmer)} | Wdr: ${fmtS(wdrEmer)}`;
+        
+        document.getElementById('total-collected').innerText = "Col: " + fmt(col);
+        document.getElementById('disp-col').innerText = fmt(col);
+        document.getElementById('net-cash').innerText = fmt(netCash);
+
+        save();
+        renderCharts(inc, exp, liab, netProfit);
+        return {inc, exp, liab, netProfit, allocatedSavings, wdrBiz, wdrPers, wdrEmer, baseBiz, basePers, baseEmer, netCash};
+    }
+
+    function renderCharts(inc, exp, liab, profit) {
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        if(barChartInst) barChartInst.destroy();
+        barChartInst = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: ['Income', 'Expense', 'Liab', 'Profit'],
+                datasets: [{
+                    label: 'Amount',
+                    data: [inc, exp, liab, profit],
+                    backgroundColor: ['#10b981', '#ef4444', '#f87171', '#f59e0b'],
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    x: { ticks: { color: '#f1f5f9' }, grid: { display: false } }
+                }
+            }
+        });
+
+        const yearlyData = getYearlyTrend();
+        const ctxLine = document.getElementById('lineChart').getContext('2d');
+        if(lineChartInst) lineChartInst.destroy();
+        lineChartInst = new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: yearlyData.labels,
+                datasets: [{
+                    label: 'Net Profit',
+                    data: yearlyData.profits,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                    x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function getYearlyTrend() {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let labels = [], profits = [];
+        const keys = [];
+        for(let i=0; i<localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if(k.startsWith('NRAPP_')) keys.push(k);
+        }
+        keys.sort((a,b) => {
+            const [p1, m1, y1] = a.split('_');
+            const [p2, m2, y2] = b.split('_');
+            if(y1 !== y2) return y1 - y2;
+            return months.indexOf(m1) - months.indexOf(m2);
+        });
+        keys.forEach(k => {
+            const d = JSON.parse(localStorage.getItem(k));
+            const sum = (arr) => arr.reduce((acc, x) => acc + (x.val||0), 0);
+            const inc = sum(d.income), exp = sum(d.expenses), liab = sum(d.liabilities);
+            labels.push(k.replace('NRAPP_', '').replace('_', ' '));
+            profits.push(inc - exp - liab);
+        });
+        return { labels, profits };
+    }
+
+    // --- REPORT GENERATION ---
+
+    function prepareReportData() {
+        const calcs = calculate();
+        
+        // 1. Fill Header
+        document.getElementById('pdf-month').innerText = currentMonth.replace('_', ' ');
+        document.getElementById('pdf-gendate').innerText = "Generated: " + new Date().toLocaleString();
+
+        // 2. Fill Summary Grid
+        document.getElementById('pdf-inc').innerText = fmt(calcs.inc);
+        document.getElementById('pdf-exp').innerText = fmt(calcs.exp);
+        document.getElementById('pdf-liab').innerText = fmt(calcs.liab);
+        document.getElementById('pdf-prof').innerText = fmt(calcs.netProfit);
+        document.getElementById('pdf-netcash').innerText = fmt(calcs.netCash);
+
+        // 3. Fill Tables
+        const fillTable = (id, list) => {
+            const tbody = document.getElementById(id);
+            tbody.innerHTML = '';
+            list.forEach(item => {
+                if(item.val > 0) {
+                    tbody.innerHTML += `<tr><td>${item.desc}</td><td style="text-align:right">${fmt(item.val)}</td></tr>`;
+                }
+            });
+            if(list.length === 0 || list.every(i => i.val == 0)) tbody.innerHTML = `<tr><td colspan="2" style="font-style:italic; color:#999;">No entries</td></tr>`;
+        };
+
+        fillTable('pdf-table-inc', data.income);
+        fillTable('pdf-table-exp', data.expenses);
+
+        // 4. Fill Savings Table
+        const saveBody = document.getElementById('pdf-table-savings');
+        saveBody.innerHTML = `
+            <tr>
+                <td>Business Fund (40%)</td>
+                <td style="text-align:right">${fmt(calcs.baseBiz)}</td>
+                <td style="text-align:right; color:#ef4444;">(${fmt(calcs.wdrBiz)})</td>
+                <td style="text-align:right; font-weight:bold">${fmt(calcs.baseBiz - calcs.wdrBiz)}</td>
+            </tr>
+            <tr>
+                <td>Personal Fund (40%)</td>
+                <td style="text-align:right">${fmt(calcs.basePers)}</td>
+                <td style="text-align:right; color:#ef4444;">(${fmt(calcs.wdrPers)})</td>
+                <td style="text-align:right; font-weight:bold">${fmt(calcs.basePers - calcs.wdrPers)}</td>
+            </tr>
+            <tr>
+                <td>Emergency Fund (20%)</td>
+                <td style="text-align:right">${fmt(calcs.baseEmer)}</td>
+                <td style="text-align:right; color:#ef4444;">(${fmt(calcs.wdrEmer)})</td>
+                <td style="text-align:right; font-weight:bold">${fmt(calcs.baseEmer - calcs.wdrEmer)}</td>
+            </tr>
+        `;
+    }
+
+    function generatePDF() {
+        closeFab();
+        prepareReportData();
+        const element = document.getElementById('pdf-report');
+        
+        // Temporarily show element to render
+        element.style.top = '0';
+        element.style.left = '0';
+        
+        const opt = {
+            margin:       0.5,
+            filename:     `NRTECH_Report_${currentMonth}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Hide again
+            element.style.top = '-9999px';
+            element.style.left = '-9999px';
+        });
+    }
+
+    function downloadReceipt() {
+        closeFab();
+        const area = document.getElementById('receipt-render');
+        const items = document.getElementById('rec-items');
+        
+        // Populate Receipt
+        document.getElementById('rec-date').innerText = new Date().toLocaleString();
+        items.innerHTML = '';
+        
+        data.income.forEach(i => { 
+            if(i.val>0) items.innerHTML += `<div class="rec-item"><span>${i.desc}</span><span>${fmt(i.val)}</span></div>`; 
+        });
+        
+        // Simple separator if expenses exist
+        if(data.expenses.some(e => e.val > 0)) {
+            items.innerHTML += `<div style="border-top:1px dashed #ccc; margin:5px 0;"></div>`;
+        }
+
+        data.expenses.forEach(i => { 
+            if(i.val>0) items.innerHTML += `<div class="rec-item"><span>${i.desc}</span><span>-${fmt(i.val)}</span></div>`; 
+        });
+
+        document.getElementById('rec-total-val').innerText = document.getElementById('dash-profit').innerText;
+
+        // Render
+        area.style.top = "0"; 
+        area.style.left = "0";
+        
+        html2canvas(area, {scale: 2}).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `Receipt_${currentMonth}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            area.style.top = "-9999px"; 
+            area.style.left = "-9999px"; 
+        });
+    }
+
+    function fmt(n) { return '₱' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function fmtS(n) { return '₱' + n.toLocaleString('en-US', {maximumFractionDigits:0}); }
+    function save() { localStorage.setItem('NRAPP_' + currentMonth, JSON.stringify(data)); }
+
+    loadMonth();
+</script>
+
+</body>
+</html>
